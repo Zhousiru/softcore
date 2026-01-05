@@ -1,0 +1,26 @@
+{
+	"schemaVersion": 1,
+	"id": "softcore",
+	"version": "${version}",
+	"name": "Softcore",
+	"description": "A soft-hardcore mod that bans players temporarily after death",
+	"authors": [
+		"syrup"
+	],
+	"license": "CC0-1.0",
+	"environment": "server",
+	"entrypoints": {
+		"server": [
+			"moe.syrup.Softcore"
+		]
+	},
+	"mixins": [
+		"softcore.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.18.4",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
