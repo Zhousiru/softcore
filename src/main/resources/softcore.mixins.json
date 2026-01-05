@@ -1,0 +1,18 @@
+{
+	"required": true,
+	"package": "moe.syrup.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"CommonListenerCookieMixin",
+		"PlayerManagerMixin",
+		"ServerPlayerEntityMixin",
+		"ServerPlayNetworkHandlerMixin",
+		"TabListMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(./gradlew.bat build)",
+      "Bash(where:*)",
+      "Bash(java:*)",
+      "Bash(set \"JAVA_HOME=C:\\\\Users\\\\Zhousiru\\\\AppData\\\\Local\\\\Programs\\\\Eclipse Adoptium\\\\jdk-21.0.9.10-hotspot\")",
+      "Bash($env:JAVA_HOME=\"C:\\\\Users\\\\Zhousiru\\\\AppData\\\\Local\\\\Programs\\\\Eclipse Adoptium\\\\jdk-21.0.9.10-hotspot\")",
+      "Bash(export JAVA_HOME:*)",
+      "Bash(./gradlew.bat genSources:*)",
+      "Bash(unzip:*)",
+      "Bash(./gradlew build:*)",
+      "Bash($env:JAVA_HOME = \"C:\\\\Users\\\\Zhousiru\\\\.jdks\\\\temurin-21.0.5\")",
+      "Bash(JAVA_HOME=\"C:\\\\Users\\\\Zhousiru\\\\.jdks\\\\temurin-21.0.5\" ./gradlew build:*)",
+      "Bash(JAVA_HOME=\"/c/Users/Zhousiru/AppData/Local/Programs/Eclipse Adoptium/jdk-21.0.9.10-hotspot\" ./gradlew build:*)",
+      "WebFetch(domain:docs.fabricmc.net)"
+    ]
+  }
+}
