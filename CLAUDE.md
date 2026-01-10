@@ -59,3 +59,10 @@ Write maintainable software that is easy to change safely. Prefer clarity over c
 - Are errors handled via LetItCrash (no silent failure)?
 - Are comments only where they add “why” or constraints?
 - Are tests added/updated for meaningful coverage?
+
+## Agent & Task Strategy
+
+- **Decompose Complexity:** When facing complex, multi-step, or large-scope problems, always break them down into discrete **Tasks**.
+- **Context Hygiene:** Use Tasks to encapsulate specific work units. This keeps the main context clean and focused on the high-level goal.
+- **Parallelize Execution:** Identify independent sub-problems and execute them concurrently using Tasks to maximize efficiency.
+- **Specialized Delegation:** Always route work to the most appropriate **Subagent**. Match the specific domain of the task (e.g., detailed coding, architecture review, testing) to the agent best suited for it.

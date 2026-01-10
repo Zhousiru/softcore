@@ -4,144 +4,89 @@ import moe.syrup.Softcore;
 import moe.syrup.config.CoolDownRule;
 import moe.syrup.data.PlayerData;
 import moe.syrup.data.SoftcoreData;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.GameType;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.EnumSet;
-import java.util.List;
 import java.util.UUID;
 
 public class BanManager {
+    private static final String BAN_MESSAGE_TEMPLATE = "你已死亡，暂时无法进入服务器\n\n重生时间: %s";
 
-    public static boolean isBanned(ServerPlayer player) {
-        return isBanned(player.getUUID());
+    public static BanState checkBanState(UUID playerId) {
+        BanState state = SoftcoreData.getInstance().getPlayerData(playerId).getBanState();
+        if (state == null) return null;
+
+        if (state.isExpired()) {
+            clearBan(playerId);
+            Softcore.LOGGER.info("Ban expired for player {}", playerId);
+            return null;
+        }
+
+        return state;
     }
 
-    public static boolean isBanned(UUID playerId) {
-        PlayerData data = SoftcoreData.getInstance().getPlayerData(playerId);
-        BanState state = data.getBanState();
-        return state != null && state.isBanned() && !state.isExpired();
-    }
-
-    public static BanState getBanState(ServerPlayer player) {
-        PlayerData data = SoftcoreData.getInstance().getPlayerData(player.getUUID());
-        return data.getBanState();
-    }
-
-    public static BanState getBanState(UUID playerId) {
-        PlayerData data = SoftcoreData.getInstance().getPlayerData(playerId);
-        return data.getBanState();
+    public static Component createBanMessage(BanState state) {
+        return Component.literal(String.format(BAN_MESSAGE_TEMPLATE, state.formatAbsoluteTime()));
     }
 
     public static void onPlayerDeath(ServerPlayer player) {
-        PlayerData data = SoftcoreData.getInstance().getPlayerData(player.getUUID());
+        UUID playerId = player.getUUID();
+        String playerName = player.getName().getString();
+
+        PlayerData data = SoftcoreData.getInstance().getPlayerData(playerId);
         Instant now = Instant.now();
         data.recordDeath(now);
 
-        Duration banDuration = calculateBanDuration(player.getUUID());
+        Duration banDuration = calculateBanDuration(data);
         if (banDuration.isZero()) {
-            Softcore.LOGGER.info("Player {} died but no ban required", player.getName().getString());
             data.setBanState(null);
-        } else {
-            ServerLevel overworld = SoftcoreData.getServer().overworld();
-            BlockPos spawnPos = overworld.getLevelData().getRespawnData().pos();
-            BanState banState = new BanState(
-                now.plus(banDuration),
-                spawnPos,
-                overworld.dimension()
-            );
-            data.setBanState(banState);
-            Softcore.LOGGER.info("Player {} banned for {}", player.getName().getString(), formatDuration(banDuration));
+            return;
         }
+
+        BanState banState = new BanState(now.plus(banDuration));
+        data.setBanState(banState);
         SoftcoreData.getInstance().save();
+
+        Softcore.LOGGER.info("Player {} (UUID: {}) banned for {}", playerName, playerId, banState.formatRemainingTime());
+
+        // 公屏广播重生时间
+        SoftcoreData.getServer().getPlayerList().broadcastSystemMessage(
+            Component.literal("§e" + playerName + " 将在 " + banState.formatAbsoluteTime() + " 重生"),
+            false
+        );
+        player.connection.disconnect(createBanMessage(banState));
     }
 
-    public static Duration calculateBanDuration(UUID playerId) {
-        PlayerData data = SoftcoreData.getInstance().getPlayerData(playerId);
-        List<Instant> deathHistory = data.getDeathHistory();
-        List<CoolDownRule> rules = Softcore.getConfig().getCoolDownRules();
-
-        for (CoolDownRule rule : rules) {
-            if (rule.matches(deathHistory)) {
+    private static Duration calculateBanDuration(PlayerData data) {
+        for (CoolDownRule rule : Softcore.getConfig().getCoolDownRules()) {
+            if (rule.matches(data.getDeathHistory())) {
                 return rule.banDuration();
             }
         }
         return Duration.ofHours(1);
     }
 
-    public static void unban(ServerPlayer player) {
-        PlayerData data = SoftcoreData.getInstance().getPlayerData(player.getUUID());
-        BanState state = data.getBanState();
-        if (state != null) {
-            state.clearBan();
-        }
-        data.setBanState(null);
-        player.setGameMode(GameType.SURVIVAL);
-        player.setCamera(player);
+    public static void clearBan(UUID playerId) {
+        SoftcoreData.getInstance().getPlayerData(playerId).setBanState(null);
         SoftcoreData.getInstance().save();
-        Softcore.LOGGER.info("Player {} has been unbanned", player.getName().getString());
     }
 
-    public static boolean enforceConsistency(ServerPlayer player) {
-        BanState state = getBanState(player);
-        boolean isSpectator = player.gameMode.getGameModeForPlayer() == GameType.SPECTATOR;
-        boolean hasValidBan = state != null && state.isBanned() && !state.isExpired();
-
-        if (isSpectator && !hasValidBan) {
-            unban(player);
-            Softcore.LOGGER.info("Consistency fix: {} restored to survival", player.getName().getString());
-            return true;
-        }
-
-        if (hasValidBan && !isSpectator) {
-            applyBanEffects(player, state);
-            Softcore.LOGGER.info("Consistency fix: {} ban effects applied", player.getName().getString());
-            return true;
-        }
-
-        return false;
-    }
-
-    public static void manualBan(ServerPlayer player, Duration duration) {
-        PlayerData data = SoftcoreData.getInstance().getPlayerData(player.getUUID());
-        ServerLevel overworld = SoftcoreData.getServer().overworld();
-        BlockPos spawnPos = overworld.getLevelData().getRespawnData().pos();
-        BanState banState = new BanState(
-            Instant.now().plus(duration),
-            spawnPos,
-            overworld.dimension()
-        );
-        data.setBanState(banState);
-        applyBanEffects(player, banState);
-        SoftcoreData.getInstance().save();
-        Softcore.LOGGER.info("Player {} manually banned for {}", player.getName().getString(), formatDuration(duration));
-    }
-
-    public static void applyBanEffects(ServerPlayer player, BanState banState) {
-        player.setGameMode(GameType.SPECTATOR);
-        ServerLevel level = SoftcoreData.getServer().getLevel(banState.getSpawnDimension());
-        if (level != null) {
-            BlockPos pos = banState.getSpawnPosition();
-            player.teleportTo(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, EnumSet.noneOf(net.minecraft.world.entity.Relative.class), player.getYRot(), player.getXRot(), false);
-        }
-    }
-
-    public static void clearDeathHistory(UUID playerId) {
+    public static void clearPlayer(UUID playerId) {
         PlayerData data = SoftcoreData.getInstance().getPlayerData(playerId);
         data.clearDeathHistory();
+        data.setBanState(null);
         SoftcoreData.getInstance().save();
+        Softcore.LOGGER.info("Cleared data for player {}", playerId);
     }
 
-    private static String formatDuration(Duration duration) {
-        long hours = duration.toHours();
-        long minutes = duration.toMinutes() % 60;
-        if (hours > 0) {
-            return hours + "h " + minutes + "m";
-        }
-        return minutes + "m";
+    public static int clearAllPlayers() {
+        SoftcoreData instance = SoftcoreData.getInstance();
+        int count = instance.getAllPlayers().size();
+        instance.clearAllPlayers();
+        instance.save();
+        Softcore.LOGGER.info("Cleared data for {} players", count);
+        return count;
     }
 }

@@ -57,6 +57,10 @@ public class SoftcoreData {
         return players;
     }
 
+    public void clearAllPlayers() {
+        players.clear();
+    }
+
     public void save() {
         try {
             Files.createDirectories(dataPath.getParent());
