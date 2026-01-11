@@ -7,6 +7,7 @@ import moe.syrup.Softcore;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,6 +25,10 @@ public class ConfigLoader {
                 { cond = "2 in 24h", time = "4h" },
                 { cond = "else", time = "1h" }
             ]
+            # Immunity duration after respawn, deaths during this period won't count
+            respawn_immunity = "20m"
+            # Show next ban duration in action bar when player has low health
+            enable_hints = true
             """;
 
     public static SoftcoreConfig load(Path configPath) {
@@ -58,7 +63,20 @@ public class ConfigLoader {
             Softcore.LOGGER.warn("No valid rules found, using defaults");
             return createDefaultSoftcoreConfig();
         }
-        return new SoftcoreConfig(rules);
+
+        Duration respawnImmunity = Duration.ofMinutes(20);
+        String immunityStr = config.get("respawn.respawn_immunity");
+        if (immunityStr != null) {
+            try {
+                respawnImmunity = CoolDownRule.parseTime(immunityStr);
+            } catch (IllegalArgumentException e) {
+                Softcore.LOGGER.warn("Invalid respawn_immunity: {}, using default 20m", immunityStr);
+            }
+        }
+
+        boolean enableHints = config.getOrElse("respawn.enable_hints", true);
+
+        return new SoftcoreConfig(rules, respawnImmunity, enableHints);
     }
 
     public static void createDefaultConfig(Path configPath) {
@@ -77,6 +95,6 @@ public class ConfigLoader {
             CoolDownRule.parse("1 in 24h", "2h"),
             CoolDownRule.parse("2 in 24h", "4h"),
             CoolDownRule.parse("else", "1h")
-        ));
+        ), Duration.ofMinutes(20), true);
     }
 }

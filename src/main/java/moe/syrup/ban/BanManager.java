@@ -9,6 +9,8 @@ import net.minecraft.server.level.ServerPlayer;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public class BanManager {
@@ -31,11 +33,24 @@ public class BanManager {
         return Component.literal(String.format(BAN_MESSAGE_TEMPLATE, state.formatAbsoluteTime()));
     }
 
+    public static boolean isInImmunity(PlayerData data) {
+        Instant lastRespawn = data.getLastRespawnTime();
+        if (lastRespawn == null) return false;
+        Duration immunity = Softcore.getConfig().getRespawnImmunity();
+        return Instant.now().isBefore(lastRespawn.plus(immunity));
+    }
+
     public static void onPlayerDeath(ServerPlayer player) {
         UUID playerId = player.getUUID();
         String playerName = player.getName().getString();
 
         PlayerData data = SoftcoreData.getInstance().getPlayerData(playerId);
+
+        if (isInImmunity(data)) {
+            Softcore.LOGGER.info("Player {} died during immunity period, skipping ban", playerName);
+            return;
+        }
+
         Instant now = Instant.now();
         data.recordDeath(now);
 
@@ -59,9 +74,20 @@ public class BanManager {
         player.connection.disconnect(createBanMessage(banState));
     }
 
-    private static Duration calculateBanDuration(PlayerData data) {
+    public static Duration calculateBanDuration(PlayerData data) {
         for (CoolDownRule rule : Softcore.getConfig().getCoolDownRules()) {
             if (rule.matches(data.getDeathHistory())) {
+                return rule.banDuration();
+            }
+        }
+        return Duration.ofHours(1);
+    }
+
+    public static Duration calculateNextBanDuration(PlayerData data) {
+        List<Instant> simulatedHistory = new ArrayList<>(data.getDeathHistory());
+        simulatedHistory.add(Instant.now());
+        for (CoolDownRule rule : Softcore.getConfig().getCoolDownRules()) {
+            if (rule.matches(simulatedHistory)) {
                 return rule.banDuration();
             }
         }

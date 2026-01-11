@@ -11,11 +11,13 @@ public class PlayerData {
     private UUID playerId;
     private List<Instant> deathHistory;
     private BanState banState;
+    private Instant lastRespawnTime;
 
     public PlayerData(UUID playerId) {
         this.playerId = playerId;
         this.deathHistory = new ArrayList<>();
         this.banState = null;
+        this.lastRespawnTime = null;
     }
 
     public UUID getPlayerId() {
@@ -40,5 +42,13 @@ public class PlayerData {
 
     public void clearDeathHistory() {
         deathHistory.clear();
+    }
+
+    public Instant getLastRespawnTime() {
+        return lastRespawnTime;
+    }
+
+    public void setLastRespawnTime(Instant lastRespawnTime) {
+        this.lastRespawnTime = lastRespawnTime;
     }
 }
